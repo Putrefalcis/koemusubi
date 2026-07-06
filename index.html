@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>こえむすび · kuromoji asset host</title>
+<style>
+  body { font: 15px/1.6 system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #2b3a2b; background: #f6f8f2; }
+  h1 { color: #4a7a5a; }
+  input { width: 100%; font-size: 18px; padding: 8px; box-sizing: border-box; }
+  #out { margin-top: 12px; padding: 12px; background: #fffdf5; border: 1px solid #cfe0cf; border-radius: 8px; min-height: 2em; white-space: pre-wrap; }
+  small { color: #777; }
+  code { background: #eef3ea; padding: 1px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>こえむすび</h1>
+<p>Static asset host for the <b>こえむすび (koemusubi)</b> Second Life kana-TTS HUD:
+the kuromoji.js tokenizer and its IPADIC dictionary. Served by GitHub Pages
+(Fastly, permissive CORS) so the in-world Media-on-a-Prim browser can load it.</p>
+
+<p>Live self-test — type Japanese and see the katakana reading the HUD would speak:</p>
+<input id="in" placeholder="今日はいい天気ですね" autofocus>
+<div id="out">loading kuromoji…</div>
+
+<p><small>Files: <code>build/kuromoji.js</code>, <code>dict/*.dat.gz</code>.
+kuromoji.js © takuyaa, Apache-2.0. Dictionary: IPADIC.</small></p>
+
+<script src="./build/kuromoji.js"></script>
+<script>
+// repair kuromoji's path.join() mangling of https:// -> https:/ (same as in-world)
+(function () {
+  var _open = XMLHttpRequest.prototype.open, rx = /^(https?):\/(?!\/)/;
+  XMLHttpRequest.prototype.open = function (m, u) {
+    if (typeof u === 'string' && rx.test(u)) u = u.replace(rx, '$1://');
+    return _open.apply(this, [m, u].concat([].slice.call(arguments, 2)));
+  };
+})();
+var out = document.getElementById('out'), inp = document.getElementById('in'), TZ = null;
+var PUNCT = '、。！？!?…「」『』（）()・,. 　';
+function reading(text) {
+  var t = TZ.tokenize(text), o = [];
+  for (var i = 0; i < t.length; i++) {
+    var w = t[i], s = w.surface_form;
+    if (PUNCT.indexOf(s) >= 0 || (w.pos && w.pos.indexOf('記号') === 0)) { o.push(' '); continue; }
+    var p = (w.pronunciation && w.pronunciation !== '*') ? w.pronunciation
+          : (w.reading && w.reading !== '*') ? w.reading : s;
+    o.push(p);
+  }
+  return o.join(' ').replace(/\s+/g, ' ').trim();
+}
+kuromoji.builder({ dicPath: './dict/' }).build(function (err, tz) {
+  if (err) { out.textContent = 'kuromoji failed: ' + err; return; }
+  TZ = tz; out.textContent = 'ready — type above';
+  inp.addEventListener('input', function () { out.textContent = inp.value ? (inp.value + '  →  ' + reading(inp.value)) : 'ready — type above'; });
+});
+</script>
+</body>
+</html>
